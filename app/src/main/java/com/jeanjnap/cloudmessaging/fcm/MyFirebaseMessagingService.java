@@ -1,13 +1,15 @@
 package com.jeanjnap.cloudmessaging.fcm;
 
 import android.app.ActivityManager;
-import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.content.Context;
+import android.app.PendingIntent;
+import android.app.TaskStackBuilder;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.support.v4.app.NotificationCompat;
+import android.support.v4.app.NotificationManagerCompat;
 import android.util.Log;
 
 import com.google.firebase.messaging.FirebaseMessagingService;
@@ -16,6 +18,7 @@ import com.google.firebase.messaging.RemoteMessage;
 import java.io.IOException;
 import java.util.List;
 
+import com.jeanjnap.cloudmessaging.Activitys.ResultActivity;
 import com.jeanjnap.cloudmessaging.R;
 import com.squareup.picasso.Picasso;
 
@@ -33,6 +36,8 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     @Override
     public void onMessageReceived(RemoteMessage message) {
+
+        Log.i("RES", "Tem mensagem pra vc");
 
         image = message.getNotification().getIcon();
         title = message.getNotification().getTitle();
@@ -77,56 +82,73 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
             e.printStackTrace();
         }
 
-        NotificationManager mNotificationManager;
-
-        NotificationCompat.Builder notification = new NotificationCompat.Builder(this.getApplicationContext(), "notify_001");
-
-        NotificationCompat.BigTextStyle bigText = new NotificationCompat.BigTextStyle();
-        bigText.setBigContentTitle(title);
-        bigText.bigText(text);
-
-
-        notification.setSmallIcon(R.drawable.ring);
-        notification.setColor(getResources().getColor(R.color.colorAccent));
-        notification.setPriority(Notification.PRIORITY_MAX);
-        notification.setStyle(bigText);
-        //notification.setAutoCancel(true);
-
-        mNotificationManager = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
-
-
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-
-            String channelId = "YOUR_CHANNEL_ID";
-            NotificationChannel channel = new NotificationChannel(channelId,
-                    "Channel human readable title",
-                    NotificationManager.IMPORTANCE_DEFAULT);
-            mNotificationManager.createNotificationChannel(channel);
-
-            notification.setChannelId(channelId);
+        // Create an Intent for the activity you want to start
+        Intent intent = new Intent(this, ResultActivity.class);
+        intent.putExtra("text", msg);
+        // Create the TaskStackBuilder and add the intent, which inflates the back stack
+        TaskStackBuilder stackBuilder = null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            stackBuilder = TaskStackBuilder.create(this);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            stackBuilder.addNextIntentWithParentStack(intent);
+        }
+        // Get the PendingIntent containing the entire back stack
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN) {
+            PendingIntent resultPendingIntent =
+                    stackBuilder.getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT);
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, 0);
 
-                Log.i(TAG, "Notifications enabled: " + mNotificationManager.areNotificationsEnabled());
-        }
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "channel_"+id)
+                .setSmallIcon(R.drawable.ring)
+                .setColor(getResources().getColor(R.color.colorAccent))
+                .setContentTitle(title)
+                .setContentText(text)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                // Set the intent that will fire when the user taps the notification
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent);
 
-        mNotificationManager.notify(id, notification.build());
+        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
+        notificationManager.notify(id, builder.build());
 
-        //mNotificationManager.cancel(id);
+        /*
+        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(this, "channel_"+id)
+                .setSmallIcon(R.drawable.ring)
+                .setColor(getResources().getColor(R.color.colorAccent))
+                .setContentTitle(title)
+                .setContentText(text)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                // Set the intent that will fire when the user taps the notification
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true);
 
+        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
+
+        createNotificationChannel();
+
+        // notificationId is a unique int for each notification that you must define
+        notificationManager.notify(id, mBuilder.build());
+        */
     }
 
-    public boolean isActivityRunning(Context ctx) {
-        ActivityManager activityManager = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
-        List<ActivityManager.RunningTaskInfo> tasks = activityManager.getRunningTasks(Integer.MAX_VALUE);
-
-        for (ActivityManager.RunningTaskInfo task : tasks) {
-            if (ctx.getPackageName().equalsIgnoreCase(task.baseActivity.getPackageName()))
-                return true;
+    private void createNotificationChannel() {
+        // Create the NotificationChannel, but only on API 26+ because
+        // the NotificationChannel class is new and not in the support library
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CharSequence name = "channel_"+id;
+            String description = "Channel description";
+            int importance = NotificationManager.IMPORTANCE_DEFAULT;
+            NotificationChannel channel = new NotificationChannel("channel_"+id, name, importance);
+            channel.setDescription(description);
+            // Register the channel with the system; you can't change the importance
+            // or other notification behaviors after this
+            NotificationManager notificationManager2 = getSystemService(NotificationManager.class);
+            notificationManager2.createNotificationChannel(channel);
         }
-
-        return false;
     }
 }
